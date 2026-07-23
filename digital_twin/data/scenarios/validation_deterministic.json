@@ -1,0 +1,47 @@
+{
+  "scenario_name": "validation_deterministic",
+  "simulation": {
+    "duration_minutes": 51,
+    "warmup_minutes": 0,
+    "seed": 42
+  },
+  "learning": {
+    "ewma_alpha": 0.20,
+    "minimum_observations": 3,
+    "switch_penalty_minutes": 0.0
+  },
+  "fleet": {
+    "number_of_trucks": 1,
+    "truck_capacity_tonnes": 100,
+    "payload_mean": 100,
+    "payload_std": 0,
+    "payload_min": 100,
+    "payload_max": 100
+  },
+  "shovels": [
+    {
+      "id": "S1",
+      "loading_distribution": "triangular",
+      "loading_min": 4.0,
+      "loading_mode": 4.0,
+      "loading_max": 4.0,
+      "mtbf_minutes": null,
+      "repair_min": null,
+      "repair_mode": null,
+      "repair_max": null
+    }
+  ],
+  "dumps": [
+    {
+      "id": "D1",
+      "dump_min": 1.0,
+      "dump_mode": 1.0,
+      "dump_max": 1.0
+    }
+  ],
+  "travel_variability": {
+    "multiplier_min": 1.0,
+    "multiplier_mode": 1.0,
+    "multiplier_max": 1.0
+  }
+}

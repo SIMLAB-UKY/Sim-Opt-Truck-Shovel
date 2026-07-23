@@ -1,0 +1,64 @@
+{
+  "scenario_name": "breakdown",
+  "simulation": {
+    "duration_minutes": 480,
+    "warmup_minutes": 30,
+    "seed": 20260715
+  },
+  "learning": {
+    "ewma_alpha": 0.20,
+    "minimum_observations": 3,
+    "switch_penalty_minutes": 0.50
+  },
+  "fleet": {
+    "number_of_trucks": 6,
+    "truck_capacity_tonnes": 95,
+    "payload_mean": 95,
+    "payload_std": 4,
+    "payload_min": 82,
+    "payload_max": 102
+  },
+  "shovels": [
+    {
+      "id": "S1",
+      "loading_distribution": "triangular",
+      "loading_min": 3.5,
+      "loading_mode": 4.5,
+      "loading_max": 6.0,
+      "mtbf_minutes": 240,
+      "repair_min": 15,
+      "repair_mode": 25,
+      "repair_max": 45
+    },
+    {
+      "id": "S2",
+      "loading_distribution": "triangular",
+      "loading_min": 4.0,
+      "loading_mode": 5.0,
+      "loading_max": 6.5,
+      "mtbf_minutes": 240,
+      "repair_min": 15,
+      "repair_mode": 25,
+      "repair_max": 45
+    }
+  ],
+  "dumps": [
+    {
+      "id": "D1",
+      "dump_min": 0.8,
+      "dump_mode": 1.2,
+      "dump_max": 2.0
+    },
+    {
+      "id": "D2",
+      "dump_min": 1.0,
+      "dump_mode": 1.5,
+      "dump_max": 2.4
+    }
+  ],
+  "travel_variability": {
+    "multiplier_min": 0.88,
+    "multiplier_mode": 1.00,
+    "multiplier_max": 1.18
+  }
+}
