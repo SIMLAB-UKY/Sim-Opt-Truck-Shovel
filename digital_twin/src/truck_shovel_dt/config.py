@@ -38,6 +38,22 @@ class Triangular:
 
 
 @dataclass(frozen=True)
+class TravelVariability:
+    multiplier_min: float
+    multiplier_mode: float
+    multiplier_max: float
+
+    def validate(self) -> None:
+        if not (self.multiplier_min <= self.multiplier_mode <= self.multiplier_max):
+            raise ConfigError(
+                "travel_variability: must satisfy min <= mode <= max, got "
+                f"({self.multiplier_min}, {self.multiplier_mode}, {self.multiplier_max})"
+            )
+        if self.multiplier_min <= 0:
+            raise ConfigError("travel_variability.multiplier_min must be positive")
+
+
+@dataclass(frozen=True)
 class ShovelConfig:
     id: str
     loading: Triangular
@@ -167,6 +183,9 @@ class ScenarioConfig:
     shovels: list[ShovelConfig]
     dumps: list[DumpConfig]
     routes: list[RouteConfig] = field(default_factory=list)
+    travel_variability: TravelVariability = field(
+        default_factory=lambda: TravelVariability(0.88, 1.00, 1.18)
+    )
 
     def validate(self) -> None:
         if not self.scenario_name:
@@ -174,6 +193,7 @@ class ScenarioConfig:
         self.simulation.validate()
         self.learning.validate()
         self.fleet.validate()
+        self.travel_variability.validate()
 
         if not self.shovels:
             raise ConfigError("At least one shovel must be defined")
@@ -241,10 +261,7 @@ def load_scenario(
     scenario_path: str | Path,
     routes_path: str | Path | None = None,
 ) -> ScenarioConfig:
-    """Load and validate a scenario JSON file and optional routes.csv.
-
-    Raises ConfigError if any required field is missing or invalid.
-    """
+    """Load and validate a scenario JSON file and optional routes.csv."""
     scenario_path = Path(scenario_path)
     if not scenario_path.exists():
         raise ConfigError(f"Scenario file not found: {scenario_path}")
@@ -276,6 +293,13 @@ def load_scenario(
     except KeyError as exc:
         raise ConfigError(f"Missing required scenario field: {exc}") from exc
 
+    tv_raw = raw.get("travel_variability", {})
+    travel_variability = TravelVariability(
+        multiplier_min=float(tv_raw.get("multiplier_min", 0.88)),
+        multiplier_mode=float(tv_raw.get("multiplier_mode", 1.00)),
+        multiplier_max=float(tv_raw.get("multiplier_max", 1.18)),
+    )
+
     shovels = []
     for s in raw.get("shovels", []):
         repair = None
@@ -302,11 +326,8 @@ def load_scenario(
             raise ConfigError(f"Routes file not found: {routes_path}")
         routes_df = pd.read_csv(routes_path)
         required_columns = {
-            "origin",
-            "destination",
-            "load_state",
-            "distance_km",
-            "mean_speed_kph",
+            "origin", "destination", "load_state",
+            "distance_km", "mean_speed_kph",
         }
         missing = required_columns - set(routes_df.columns)
         if missing:
@@ -330,6 +351,7 @@ def load_scenario(
         shovels=shovels,
         dumps=dumps,
         routes=routes,
+        travel_variability=travel_variability,
     )
     config.validate()
     return config
