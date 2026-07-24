@@ -1,6 +1,6 @@
 # Contributors
 
-## Ali Kamel
+## Ali Kamelshahroudi
 Role: Primary Developer
 
 ### Responsibilities
