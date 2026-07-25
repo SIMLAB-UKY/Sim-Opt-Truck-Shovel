@@ -309,3 +309,141 @@ def build_system_state(
         routes=route_states,
         current_location=current_location,
     )
+
+
+# ---------------------------------------------------------------------------
+# Policy 3: Adaptive Estimated Completion Time (ECT)
+# ---------------------------------------------------------------------------
+
+class AdaptiveECT:
+    """Adaptive dispatch using estimated completion time scoring.
+
+    For truck i and candidate shovel s, the score is:
+
+        Score(i, s) = T_empty(i→s)
+                    + R_s + Q_s * T_loading(s)
+                    + T_loading(s)
+                    + min_d [ T_loaded(s→d) + W_d + T_dumping(d) ]
+
+    where:
+        T_empty     = EWMA empty travel estimate
+        R_s         = remaining service time at shovel s
+        Q_s         = trucks waiting in queue at shovel s
+        T_loading   = EWMA loading estimate for shovel s
+        T_loaded    = EWMA loaded travel estimate
+        W_d         = estimated waiting time at dump d (queue * dumping time)
+        T_dumping   = EWMA dumping estimate
+
+    The truck is assigned to the feasible shovel with the lowest score.
+    A switching penalty is added when changing from the truck's last shovel.
+    """
+
+    name = "adaptive_ect"
+
+    def __init__(
+        self,
+        estimators: "EstimatorRegistry",  # noqa: F821
+        switch_penalty_minutes: float = 0.5,
+        last_shovel: dict[str, str] | None = None,
+    ) -> None:
+        self._estimators = estimators
+        self._penalty = switch_penalty_minutes
+        self._last_shovel: dict[str, str] = last_shovel if last_shovel is not None else {}
+
+    def choose_assignment(
+        self, state: SystemState, truck_id: str
+    ) -> Assignment:
+        available_shovels = [s for s in state.shovels if s.available]
+
+        if not available_shovels:
+            fallback = state.shovels[0]
+            fallback_dump = state.dumps[0]
+            return Assignment(
+                shovel_id=fallback.shovel_id,
+                dump_id=fallback_dump.dump_id,
+                score=9999.0,
+                explanation=f"Truck {truck_id}: no shovel available.",
+            )
+
+        best_score = float("inf")
+        best_shovel_id = ""
+        best_dump_id = ""
+        best_components: dict = {}
+
+        for shovel in available_shovels:
+            sid = shovel.shovel_id
+
+            # Empty travel estimate
+            t_empty = self._estimators.get_empty_travel(
+                state.current_location, sid
+            )
+
+            # Queue and loading estimate
+            t_loading = self._estimators.get_loading(sid)
+            queue_time = shovel.remaining_service_min + shovel.queue_length * t_loading
+
+            # Best dump estimate
+            available_dumps = [d for d in state.dumps if d.available]
+            if not available_dumps:
+                available_dumps = state.dumps
+
+            best_dump_score = float("inf")
+            best_dump = available_dumps[0]
+            for dump in available_dumps:
+                did = dump.dump_id
+                t_loaded = self._estimators.get_loaded_travel(sid, did)
+                t_dumping = self._estimators.get_dumping(did)
+                w_d = dump.queue_length * t_dumping
+                dump_score = t_loaded + w_d + t_dumping
+                if dump_score < best_dump_score or (
+                    dump_score == best_dump_score and did < best_dump.dump_id
+                ):
+                    best_dump_score = dump_score
+                    best_dump = dump
+
+            # Total score
+            score = t_empty + queue_time + t_loading + best_dump_score
+
+            # Switching penalty
+            penalty = 0.0
+            if truck_id in self._last_shovel and self._last_shovel[truck_id] != sid:
+                penalty = self._penalty
+            score += penalty
+
+            if score < best_score or (
+                score == best_score and sid < best_shovel_id
+            ):
+                best_score = score
+                best_shovel_id = sid
+                best_dump_id = best_dump.dump_id
+                best_components = {
+                    "t_empty": round(t_empty, 3),
+                    "queue_time": round(queue_time, 3),
+                    "t_loading": round(t_loading, 3),
+                    "best_dump_score": round(best_dump_score, 3),
+                    "switch_penalty": round(penalty, 3),
+                    "total_score": round(score, 3),
+                }
+
+        # Record last assignment
+        self._last_shovel[truck_id] = best_shovel_id
+
+        # Build explanation
+        component_str = ", ".join(
+            f"{k}={v}" for k, v in best_components.items()
+        )
+        explanation = (
+            f"Truck {truck_id}: adaptive ECT → {best_shovel_id}, {best_dump_id}. "
+            f"Score={best_score:.2f} ({component_str})."
+        )
+
+        return Assignment(
+            shovel_id=best_shovel_id,
+            dump_id=best_dump_id,
+            score=best_score,
+            explanation=explanation,
+        )
+
+
+# Late import to avoid circular dependency
+from truck_shovel_dt.estimators import EstimatorRegistry  # noqa: E402
