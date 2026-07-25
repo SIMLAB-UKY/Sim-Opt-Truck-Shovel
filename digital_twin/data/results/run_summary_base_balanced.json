@@ -1,0 +1,98 @@
+{
+  "scenario_name": "base_balanced",
+  "policy": "fixed",
+  "seed": 20260715,
+  "duration_minutes": 480.0,
+  "warmup_minutes": 30.0,
+  "number_of_trucks": 6,
+  "kpis": {
+    "policy": "fixed",
+    "warmup_minutes": 30.0,
+    "simulation_duration_minutes": 480.0,
+    "total_production_tonnes": 14965.7,
+    "tonnes_per_operating_hour": 1995.43,
+    "completed_trips": 158,
+    "mean_cycle_time_min": 17.14,
+    "min_cycle_time_min": 14.75,
+    "max_cycle_time_min": 20.06,
+    "mean_shovel_queue_wait_min": 0.304,
+    "mean_dump_queue_wait_min": 0.0,
+    "mean_truck_utilization": 0.6761,
+    "shovel_utilization": {
+      "S1": 0.0,
+      "S2": 0.9193
+    },
+    "shovel_idle_time_min": {
+      "S1": 450.0,
+      "S2": 36.32
+    }
+  },
+  "truck_trip_counts": {
+    "T01": 27,
+    "T02": 29,
+    "T03": 26,
+    "T04": 28,
+    "T05": 26,
+    "T06": 28
+  },
+  "truck_kpi_table": [
+    {
+      "truck_id": "T01",
+      "completed_trips": 26,
+      "total_tonnes": 2470.64,
+      "mean_shovel_wait_min": 0.0672,
+      "utilization": 0.606
+    },
+    {
+      "truck_id": "T02",
+      "completed_trips": 28,
+      "total_tonnes": 2705.72,
+      "mean_shovel_wait_min": 0.5077,
+      "utilization": 0.6381
+    },
+    {
+      "truck_id": "T03",
+      "completed_trips": 25,
+      "total_tonnes": 2342.99,
+      "mean_shovel_wait_min": 0.1596,
+      "utilization": 0.7226
+    },
+    {
+      "truck_id": "T04",
+      "completed_trips": 27,
+      "total_tonnes": 2514.96,
+      "mean_shovel_wait_min": 0.342,
+      "utilization": 0.7348
+    },
+    {
+      "truck_id": "T05",
+      "completed_trips": 25,
+      "total_tonnes": 2397.99,
+      "mean_shovel_wait_min": 0.2908,
+      "utilization": 0.7073
+    },
+    {
+      "truck_id": "T06",
+      "completed_trips": 27,
+      "total_tonnes": 2533.41,
+      "mean_shovel_wait_min": 0.4269,
+      "utilization": 0.6478
+    }
+  ],
+  "resource_kpi_table": [
+    {
+      "resource_id": "S1",
+      "resource_type": "shovel",
+      "completed_loads": 76,
+      "utilization": 0.0,
+      "idle_time_min": 450.0
+    },
+    {
+      "resource_id": "S2",
+      "resource_type": "shovel",
+      "completed_loads": 81,
+      "utilization": 0.9193,
+      "idle_time_min": 36.32
+    }
+  ]
+}
