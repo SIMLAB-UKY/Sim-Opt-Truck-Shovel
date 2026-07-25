@@ -12,12 +12,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
 
 from truck_shovel_dt.config import load_scenario
-from truck_shovel_dt.simulation import MinimalSimulation, Sampler
+from truck_shovel_dt.simulation import TruckShovelSimulation, Sampler
+from truck_shovel_dt.metrics import KPICalculator
 
 DETERMINISTIC_VALUES = {
     "empty_travel": 5.0,
@@ -63,6 +65,16 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Override random seed.",
     )
+    parser.add_argument(
+        "--output",
+        default="data/results",
+        help="Directory to save event log and summary.",
+    )
+    parser.add_argument(
+        "--no-save",
+        action="store_true",
+        help="Do not save output files.",
+    )
     return parser.parse_args()
 
 
@@ -92,22 +104,64 @@ def main() -> None:
     print(f"Policy   : {args.policy}")
     print()
 
-    model = MinimalSimulation(
+    model = TruckShovelSimulation(
         config=config,
         sampler=sampler,
-        shovel_id=config.shovels[0].id,
-        dump_id=config.dumps[0].id,
         policy=args.policy,
     )
     result = model.run()
 
+    # ── KPI calculation ──────────────────────────────────────────────────
+    df = result.event_log.to_dataframe()
+    calculator = KPICalculator(
+        event_log=df,
+        warmup_minutes=config.simulation.warmup_minutes,
+        simulation_duration_minutes=config.simulation.duration_minutes,
+    )
+    kpis = calculator.calculate()
+
+    # ── Print trace and summary ──────────────────────────────────────────
     result.event_log.print_trace()
 
-    print(f"Completed trips      : {result.completed_trips}")
-    print(f"Total production     : {result.total_production_tonnes:.1f} tonnes")
-    if result.completed_trips > 0:
-        avg = result.total_production_tonnes / result.completed_trips
-        print(f"Average payload      : {avg:.1f} tonnes/trip")
+    print("─" * 50)
+    print(f"Completed trips      : {kpis.production.completed_trips}")
+    print(f"Total production     : {kpis.production.total_production_tonnes:.1f} tonnes")
+    print(f"Tonnes per hour      : {kpis.production.tonnes_per_operating_hour:.1f} t/h")
+    print(f"Mean cycle time      : {kpis.cycle.mean_cycle_time_min:.1f} min")
+    print(f"Mean shovel queue    : {kpis.queue.mean_shovel_queue_wait_min:.2f} min")
+    print(f"Mean truck utiliz.   : {kpis.utilization.mean_truck_utilization:.1%}")
+    print(f"Shovel utilization   : { {k: f'{v:.1%}' for k, v in kpis.utilization.shovel_utilization.items()} }")
+    print("─" * 50)
+
+    # ── Save outputs ─────────────────────────────────────────────────────
+    if not args.no_save:
+        output_dir = Path(args.output)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        scenario_slug = config.scenario_name.replace(" ", "_")
+
+        # Event log
+        event_log_path = output_dir / f"event_log_{scenario_slug}.csv"
+        result.event_log.save(event_log_path)
+        print(f"Event log saved  : {event_log_path}")
+
+        # run_summary.json — combines simulation info + KPIs
+        summary = {
+            "scenario_name": config.scenario_name,
+            "policy": args.policy,
+            "seed": seed,
+            "duration_minutes": config.simulation.duration_minutes,
+            "warmup_minutes": config.simulation.warmup_minutes,
+            "number_of_trucks": config.fleet.number_of_trucks,
+            "kpis": kpis.to_dict(),
+            "truck_trip_counts": result.truck_trip_counts,
+            "truck_kpi_table": calculator.truck_kpi_table().to_dict(orient="records"),
+            "resource_kpi_table": calculator.resource_kpi_table().to_dict(orient="records"),
+        }
+        summary_path = output_dir / f"run_summary_{scenario_slug}.json"
+        with open(summary_path, "w", encoding="utf-8") as f:
+            json.dump(summary, f, indent=2)
+        print(f"Run summary saved: {summary_path}")
 
 
 if __name__ == "__main__":
