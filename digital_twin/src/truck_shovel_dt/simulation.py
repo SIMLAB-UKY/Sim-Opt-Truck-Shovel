@@ -1,7 +1,11 @@
 """Simulation engine for the Adaptive Truck-Shovel Digital Twin.
 
-Day 5 scope: multiple trucks, multiple shovels, multiple dumps,
-full route matrix, fixed-assignment policy, event log export.
+Day 9 scope: full network with disruptions, shovel failure/repair,
+and rerouting when assigned shovel becomes unavailable.
+
+Rerouting rule (Section 10.10):
+- If shovel fails BEFORE truck joins queue → immediate reroute.
+- If shovel fails WHILE truck is waiting → truck released and reroutes.
 """
 
 from __future__ import annotations
@@ -16,6 +20,7 @@ import pandas as pd
 import simpy
 
 from truck_shovel_dt.config import ScenarioConfig
+from truck_shovel_dt.disruptions import ShovelAvailability, shovel_disruption_process
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +125,16 @@ class Sampler:
             f.payload_max,
         ))
 
+    def repair(self, shovel_id: str) -> float:
+        shovel = next(s for s in self._config.shovels if s.id == shovel_id)
+        if shovel.repair is None:
+            return 0.0
+        return float(self._rng.triangular(
+            shovel.repair.minimum,
+            shovel.repair.mode,
+            shovel.repair.maximum,
+        ))
+
     def _get_route(self, origin: str, destination: str, load_state: str):
         for r in self._config.routes:
             if (
@@ -128,20 +143,22 @@ class Sampler:
                 and r.load_state == load_state
             ):
                 return r
+        # Fallback: find any route to destination with same load_state
+        for r in self._config.routes:
+            if r.destination == destination and r.load_state == load_state:
+                return r
+        # Last resort: any route to destination
+        for r in self._config.routes:
+            if r.destination == destination:
+                return r
         raise ValueError(f"No {load_state} route from {origin} to {destination}")
 
 
 # ---------------------------------------------------------------------------
-# Fixed-assignment policy
+# Fixed-assignment policy (internal to simulation)
 # ---------------------------------------------------------------------------
 
 class FixedAssignment:
-    """Assign trucks to shovels before the shift based on truck index.
-
-    Truck index % n_shovels determines the assigned shovel.
-    The dump is chosen as the one with the shortest loaded travel time
-    from the assigned shovel.
-    """
     name = "fixed"
 
     def __init__(self, config: ScenarioConfig) -> None:
@@ -151,14 +168,25 @@ class FixedAssignment:
         self._assignments: dict[str, tuple[str, str]] = {}
 
     def assign(self, truck_id: str, truck_index: int) -> tuple[str, str]:
-        """Return (shovel_id, dump_id) for this truck."""
         shovel_id = self._shovels[truck_index % len(self._shovels)]
         dump_id = self._best_dump(shovel_id)
         self._assignments[truck_id] = (shovel_id, dump_id)
         return shovel_id, dump_id
 
-    def get_assignment(self, truck_id: str) -> tuple[str, str]:
-        return self._assignments[truck_id]
+    def get_assignment(
+        self,
+        truck_id: str,
+        availability: ShovelAvailability,
+    ) -> tuple[str, str]:
+        shovel_id, dump_id = self._assignments.get(
+            truck_id, (self._shovels[0], self._dumps[0])
+        )
+        if not availability.is_available(shovel_id):
+            available = availability.available_shovels()
+            if available:
+                shovel_id = available[0]
+                dump_id = self._best_dump(shovel_id)
+        return shovel_id, dump_id
 
     def _best_dump(self, shovel_id: str) -> str:
         best_dump = self._dumps[0]
@@ -196,11 +224,11 @@ class SimulationResult:
 
 
 # ---------------------------------------------------------------------------
-# Main simulation model — Day 5: full network
+# Main simulation — Day 9: disruptions integrated
 # ---------------------------------------------------------------------------
 
 class TruckShovelSimulation:
-    """Multiple trucks, multiple shovels, multiple dumps, full route matrix."""
+    """Multiple trucks, multiple shovels, multiple dumps, with disruptions."""
 
     def __init__(
         self,
@@ -208,6 +236,7 @@ class TruckShovelSimulation:
         sampler: Sampler,
         policy: str = "fixed",
         number_of_trucks: int | None = None,
+        enable_disruptions: bool = True,
     ) -> None:
         self._config = config
         self._sampler = sampler
@@ -217,18 +246,16 @@ class TruckShovelSimulation:
             if number_of_trucks is not None
             else config.fleet.number_of_trucks
         )
+        self._enable_disruptions = enable_disruptions
         self._event_log = EventLog()
         self._total_tonnes = 0.0
         self._completed_trips = 0
         self._truck_trip_counts: dict[str, int] = {}
-
-        # Fixed assignment policy
         self._fixed_policy = FixedAssignment(config)
 
     def run(self) -> SimulationResult:
         env = simpy.Environment()
 
-        # One simpy.Resource per shovel and per dump
         shovel_resources = {
             s.id: simpy.Resource(env, capacity=1)
             for s in self._config.shovels
@@ -238,8 +265,33 @@ class TruckShovelSimulation:
             for d in self._config.dumps
         }
 
+        # Availability tracker shared by truck and disruption processes
+        availability = ShovelAvailability(
+            shovel_ids=[s.id for s in self._config.shovels]
+        )
+
         end_time = self._config.simulation.duration_minutes
 
+        # Start disruption processes for shovels that have mtbf configured
+        if self._enable_disruptions:
+            for shovel in self._config.shovels:
+                if shovel.mtbf_minutes is not None and shovel.repair is not None:
+                    env.process(
+                        shovel_disruption_process(
+                            env=env,
+                            shovel_id=shovel.id,
+                            mtbf_minutes=shovel.mtbf_minutes,
+                            repair_min=shovel.repair.minimum,
+                            repair_mode=shovel.repair.mode,
+                            repair_max=shovel.repair.maximum,
+                            availability=availability,
+                            rng=self._sampler._rng,
+                            event_log_fn=self._log_disruption,
+                            end_time=end_time,
+                        )
+                    )
+
+        # Start truck processes
         for i in range(self._n_trucks):
             truck_id = f"T{i + 1:02d}"
             self._truck_trip_counts[truck_id] = 0
@@ -252,6 +304,7 @@ class TruckShovelSimulation:
                     dump_id=dump_id,
                     shovel_resources=shovel_resources,
                     dump_resources=dump_resources,
+                    availability=availability,
                     end_time=end_time,
                 )
             )
@@ -274,6 +327,9 @@ class TruckShovelSimulation:
             **kwargs,
         )
 
+    def _log_disruption(self, **kwargs: Any) -> None:
+        self._event_log.log(policy=self._policy_name, **kwargs)
+
     def _truck_process(
         self,
         env: simpy.Environment,
@@ -282,11 +338,22 @@ class TruckShovelSimulation:
         dump_id: str,
         shovel_resources: dict[str, simpy.Resource],
         dump_resources: dict[str, simpy.Resource],
+        availability: ShovelAvailability,
         end_time: float,
     ):
         current_location = dump_id
 
         while env.now < end_time:
+            # ── Re-check assignment (shovel may have failed) ─────────────
+            shovel_id, dump_id = self._fixed_policy.get_assignment(
+                truck_id, availability
+            )
+
+            # If no shovel available, wait briefly and retry
+            if not availability.is_available(shovel_id):
+                yield env.timeout(1.0)
+                continue
+
             # ── 1. Dispatch ──────────────────────────────────────────────
             self._log(env, "DISPATCH",
                 truck_id=truck_id,
@@ -305,6 +372,18 @@ class TruckShovelSimulation:
                 duration_min=round(empty_duration, 4),
             )
             yield env.timeout(empty_duration)
+
+            # Check if shovel failed during travel
+            if not availability.is_available(shovel_id):
+                self._log(env, "REROUTE",
+                    truck_id=truck_id,
+                    origin=shovel_id,
+                    destination="",
+                    notes=f"Shovel {shovel_id} unavailable on arrival; rerouting.",
+                )
+                current_location = shovel_id
+                continue
+
             self._log(env, "EMPTY_TRAVEL_END",
                 truck_id=truck_id,
                 origin=current_location,
@@ -321,8 +400,21 @@ class TruckShovelSimulation:
                 shovel_id=shovel_id,
                 queue_length=len(shovel_resource.queue),
             )
+
             with shovel_resource.request() as req:
                 yield req
+
+                # Check again after acquiring resource
+                if not availability.is_available(shovel_id):
+                    self._log(env, "REROUTE",
+                        truck_id=truck_id,
+                        origin=shovel_id,
+                        destination="",
+                        notes=f"Shovel {shovel_id} failed while waiting; rerouting.",
+                    )
+                    current_location = shovel_id
+                    continue
+
                 queue_wait = round(env.now - queue_start, 4)
                 loading_duration = self._sampler.loading(shovel_id)
                 self._log(env, "LOADING_START",
@@ -401,7 +493,7 @@ class TruckShovelSimulation:
 
 
 # ---------------------------------------------------------------------------
-# Backward-compatible alias (Day 3/4 tests use MinimalSimulation)
+# Backward-compatible alias
 # ---------------------------------------------------------------------------
 
 class MinimalSimulation(TruckShovelSimulation):
@@ -421,8 +513,8 @@ class MinimalSimulation(TruckShovelSimulation):
             sampler=sampler,
             policy=policy,
             number_of_trucks=number_of_trucks,
+            enable_disruptions=False,
         )
-        # Override fixed assignments to use specified shovel/dump
         self._shovel_id = shovel_id
         self._dump_id = dump_id
 
@@ -436,12 +528,11 @@ class MinimalSimulation(TruckShovelSimulation):
             d.id: simpy.Resource(env, capacity=1)
             for d in self._config.dumps
         }
-        end_time = self._config.simulation.duration_minutes
-        n = (
-            self._n_trucks
-            if self._n_trucks is not None
-            else self._config.fleet.number_of_trucks
+        availability = ShovelAvailability(
+            shovel_ids=[s.id for s in self._config.shovels]
         )
+        end_time = self._config.simulation.duration_minutes
+        n = self._n_trucks
         for i in range(n):
             truck_id = f"T{i + 1:02d}"
             self._truck_trip_counts[truck_id] = 0
@@ -453,6 +544,7 @@ class MinimalSimulation(TruckShovelSimulation):
                     dump_id=self._dump_id,
                     shovel_resources=shovel_resources,
                     dump_resources=dump_resources,
+                    availability=availability,
                     end_time=end_time,
                 )
             )
