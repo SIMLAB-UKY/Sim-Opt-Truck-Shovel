@@ -1,0 +1,15 @@
+{
+  "scenario": "data/scenarios/base_scenario.json",
+  "scenario_name": "base_balanced",
+  "policies": [
+    "fixed",
+    "shortest_queue",
+    "adaptive_ect"
+  ],
+  "replications": 20,
+  "base_seed": 20260715,
+  "disruptions": false,
+  "elapsed_seconds": 1.74,
+  "git_commit": "20acaf2",
+  "timestamp": "2026-07-30T10:13:37"
+}
