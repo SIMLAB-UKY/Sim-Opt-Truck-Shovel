@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import pytest
 
-from truck_shovel_dt.estimators import EWMAEstimator, EstimatorRegistry
 from truck_shovel_dt.dispatch import (
     AdaptiveECT,
     DumpState,
@@ -24,11 +23,12 @@ from truck_shovel_dt.dispatch import (
     SystemState,
     build_system_state,
 )
-
+from truck_shovel_dt.estimators import EstimatorRegistry, EWMAEstimator
 
 # ---------------------------------------------------------------------------
 # EWMAEstimator tests
 # ---------------------------------------------------------------------------
+
 
 def test_ewma_initial_estimate():
     e = EWMAEstimator(name="test", initial_estimate=5.0, alpha=0.2)
@@ -64,9 +64,7 @@ def test_ewma_observation_count():
 
 
 def test_ewma_reliability_flag():
-    e = EWMAEstimator(
-        name="test", initial_estimate=5.0, alpha=0.2, minimum_observations=3
-    )
+    e = EWMAEstimator(name="test", initial_estimate=5.0, alpha=0.2, minimum_observations=3)
     assert not e.is_reliable
     e.update(5.0)
     e.update(5.0)
@@ -93,6 +91,7 @@ def test_ewma_alpha_one_replaces_estimate():
 # ---------------------------------------------------------------------------
 # EstimatorRegistry tests
 # ---------------------------------------------------------------------------
+
 
 def make_registry() -> EstimatorRegistry:
     reg = EstimatorRegistry(alpha=0.2, minimum_observations=3)
@@ -144,6 +143,7 @@ def test_registry_summary_keys():
 # ---------------------------------------------------------------------------
 # AdaptiveECT policy tests
 # ---------------------------------------------------------------------------
+
 
 def make_state_for_ect(
     s1_queue: int = 0,
@@ -204,7 +204,7 @@ def test_adaptive_ect_score_changes_with_queue():
     state_empty = make_state_for_ect(s1_queue=0, s2_queue=0)
     state_crowded = make_state_for_ect(s1_queue=5, s2_queue=0)
 
-    result_empty = policy.choose_assignment(state_empty, "T01")
+    policy.choose_assignment(state_empty, "T01")
     result_crowded = policy.choose_assignment(state_crowded, "T02")
 
     # With S1 crowded, S2 should be preferred
@@ -226,7 +226,7 @@ def test_adaptive_ect_switching_penalty_applied():
     )
     state = make_state_for_ect(s1_queue=0, s2_queue=0)
 
-    result_no_penalty = policy_no_penalty.choose_assignment(state, "T01")
+    policy_no_penalty.choose_assignment(state, "T01")
     result_with_penalty = policy_with_penalty.choose_assignment(state, "T01")
 
     # With large penalty, truck should stay at S2

@@ -14,8 +14,6 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
-
 from truck_shovel_dt.dispatch import (
     Assignment,
     DispatchPolicy,
@@ -28,10 +26,10 @@ from truck_shovel_dt.dispatch import (
     build_system_state,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers — fabricated state snapshots
 # ---------------------------------------------------------------------------
+
 
 def make_routes(
     s1_empty: float = 5.0,
@@ -81,6 +79,7 @@ def make_state(
 # Protocol compliance
 # ---------------------------------------------------------------------------
 
+
 def test_fixed_assignment_implements_protocol():
     assignments = {"T01": ("S1", "D1"), "T02": ("S2", "D2")}
     policy = FixedAssignment(assignments)
@@ -97,6 +96,7 @@ def test_shortest_queue_implements_protocol():
 # ---------------------------------------------------------------------------
 # FixedAssignment tests
 # ---------------------------------------------------------------------------
+
 
 def test_fixed_assignment_returns_correct_shovel():
     assignments = {"T01": ("S1", "D1"), "T02": ("S2", "D2")}
@@ -144,14 +144,13 @@ def test_fixed_assignment_from_config():
 # ShortestQueue tests
 # ---------------------------------------------------------------------------
 
+
 def test_shortest_queue_selects_shorter_queue():
     """Acceptance check: S1=3, S2=1 → must select S2."""
     policy = ShortestQueue()
     state = make_state(s1_queue=3, s2_queue=1)
     result = policy.choose_assignment(state, "T01")
-    assert result.shovel_id == "S2", (
-        f"Expected S2 (queue=1) but got {result.shovel_id}"
-    )
+    assert result.shovel_id == "S2", f"Expected S2 (queue=1) but got {result.shovel_id}"
 
 
 def test_shortest_queue_unavailable_shovel_excluded():
@@ -159,18 +158,14 @@ def test_shortest_queue_unavailable_shovel_excluded():
     policy = ShortestQueue()
     state = make_state(s1_queue=3, s2_queue=1, s2_available=False)
     result = policy.choose_assignment(state, "T01")
-    assert result.shovel_id == "S1", (
-        f"S2 is unavailable; expected S1 but got {result.shovel_id}"
-    )
+    assert result.shovel_id == "S1", f"S2 is unavailable; expected S1 but got {result.shovel_id}"
 
 
 def test_shortest_queue_tie_broken_by_travel_time():
     """When queue lengths are equal, shorter travel time wins."""
     policy = ShortestQueue()
     # S1 travel = 5, S2 travel = 7 → S1 should win
-    state = make_state(s1_queue=1, s2_queue=1, routes=make_routes(
-        s1_empty=5.0, s2_empty=7.0
-    ))
+    state = make_state(s1_queue=1, s2_queue=1, routes=make_routes(s1_empty=5.0, s2_empty=7.0))
     result = policy.choose_assignment(state, "T01")
     assert result.shovel_id == "S1"
 
@@ -178,9 +173,7 @@ def test_shortest_queue_tie_broken_by_travel_time():
 def test_shortest_queue_tie_broken_by_id_when_equal_travel():
     """When queue and travel are equal, lexicographic ID wins (S1 < S2)."""
     policy = ShortestQueue()
-    state = make_state(s1_queue=1, s2_queue=1, routes=make_routes(
-        s1_empty=5.0, s2_empty=5.0
-    ))
+    state = make_state(s1_queue=1, s2_queue=1, routes=make_routes(s1_empty=5.0, s2_empty=5.0))
     result = policy.choose_assignment(state, "T01")
     assert result.shovel_id == "S1"
 

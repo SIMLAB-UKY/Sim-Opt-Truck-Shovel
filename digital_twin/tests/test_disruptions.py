@@ -13,7 +13,6 @@ Covers:
 
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -21,25 +20,19 @@ import pytest
 
 from truck_shovel_dt.config import load_scenario
 from truck_shovel_dt.disruptions import ShovelAvailability
-from truck_shovel_dt.simulation import TruckShovelSimulation, Sampler
+from truck_shovel_dt.simulation import Sampler, TruckShovelSimulation
 
-BASE_SCENARIO = (
-    Path(__file__).resolve().parents[1]
-    / "data" / "scenarios" / "base_scenario.json"
-)
+BASE_SCENARIO = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "base_scenario.json"
 BREAKDOWN_SCENARIO = (
-    Path(__file__).resolve().parents[1]
-    / "data" / "scenarios" / "breakdown_scenario.json"
+    Path(__file__).resolve().parents[1] / "data" / "scenarios" / "breakdown_scenario.json"
 )
-ROUTES = (
-    Path(__file__).resolve().parents[1]
-    / "data" / "scenarios" / "routes.csv"
-)
+ROUTES = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "routes.csv"
 
 
 # ---------------------------------------------------------------------------
 # ShovelAvailability unit tests
 # ---------------------------------------------------------------------------
+
 
 def test_availability_initial_state():
     avail = ShovelAvailability(shovel_ids=["S1", "S2"])
@@ -82,6 +75,7 @@ def test_availability_all_failed():
 # Simulation disruption tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def breakdown_result():
     """Run breakdown scenario with disruptions enabled."""
@@ -112,19 +106,13 @@ def base_result_no_disruptions():
 
 def test_shovel_failed_events_logged(breakdown_result):
     """SHOVEL_FAILED events must appear in the event log."""
-    events = [
-        r["event_type"]
-        for r in breakdown_result.event_log.records
-    ]
+    events = [r["event_type"] for r in breakdown_result.event_log.records]
     assert "SHOVEL_FAILED" in events, "No SHOVEL_FAILED events found"
 
 
 def test_shovel_repaired_events_logged(breakdown_result):
     """SHOVEL_REPAIRED events must appear in the event log."""
-    events = [
-        r["event_type"]
-        for r in breakdown_result.event_log.records
-    ]
+    events = [r["event_type"] for r in breakdown_result.event_log.records]
     assert "SHOVEL_REPAIRED" in events, "No SHOVEL_REPAIRED events found"
 
 
@@ -133,7 +121,8 @@ def test_shovel_repair_follows_failure(breakdown_result):
     records = breakdown_result.event_log.records
     for shovel_id in ["S1", "S2"]:
         shovel_events = [
-            r for r in records
+            r
+            for r in records
             if r.get("shovel_id") == shovel_id
             and r["event_type"] in ("SHOVEL_FAILED", "SHOVEL_REPAIRED")
         ]
@@ -141,7 +130,8 @@ def test_shovel_repair_follows_failure(breakdown_result):
             if event["event_type"] == "SHOVEL_FAILED":
                 if i + 1 < len(shovel_events):
                     assert shovel_events[i + 1]["event_type"] in (
-                        "SHOVEL_REPAIR_START", "SHOVEL_REPAIRED"
+                        "SHOVEL_REPAIR_START",
+                        "SHOVEL_REPAIRED",
                     )
 
 
@@ -163,15 +153,12 @@ def test_no_loading_during_failure(breakdown_result):
                 fail_time = None
 
         for r in records:
-            if (
-                r["event_type"] == "LOADING_START"
-                and r.get("shovel_id") == shovel_id
-            ):
+            if r["event_type"] == "LOADING_START" and r.get("shovel_id") == shovel_id:
                 t = r["sim_time_min"]
                 for start, end in failed_periods:
-                    assert not (start <= t <= end), (
-                        f"Loading at {shovel_id} during failure period [{start}, {end}]"
-                    )
+                    assert not (
+                        start <= t <= end
+                    ), f"Loading at {shovel_id} during failure period [{start}, {end}]"
 
 
 def test_breakdown_simulation_completes(breakdown_result):

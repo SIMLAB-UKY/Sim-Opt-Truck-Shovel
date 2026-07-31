@@ -32,8 +32,7 @@ class Triangular:
             )
         if self.minimum <= 0:
             raise ConfigError(
-                f"{name}: triangular minimum must be positive, "
-                f"got {self.minimum}"
+                f"{name}: triangular minimum must be positive, " f"got {self.minimum}"
             )
 
 
@@ -66,8 +65,7 @@ class ShovelConfig:
         self.loading.validate(f"shovel[{self.id}].loading")
         if self.mtbf_minutes is not None and self.mtbf_minutes <= 0:
             raise ConfigError(
-                f"shovel[{self.id}].mtbf_minutes must be positive, "
-                f"got {self.mtbf_minutes}"
+                f"shovel[{self.id}].mtbf_minutes must be positive, " f"got {self.mtbf_minutes}"
             )
         if self.repair is not None:
             self.repair.validate(f"shovel[{self.id}].repair")
@@ -96,8 +94,7 @@ class FleetConfig:
     def validate(self) -> None:
         if self.number_of_trucks <= 0:
             raise ConfigError(
-                f"fleet.number_of_trucks must be positive, "
-                f"got {self.number_of_trucks}"
+                f"fleet.number_of_trucks must be positive, " f"got {self.number_of_trucks}"
             )
         if self.truck_capacity_tonnes <= 0:
             raise ConfigError("fleet.truck_capacity_tonnes must be positive")
@@ -105,8 +102,7 @@ class FleetConfig:
             raise ConfigError("fleet.payload_std must be nonnegative")
         if not (self.payload_min <= self.payload_mean <= self.payload_max):
             raise ConfigError(
-                "fleet payload bounds must satisfy "
-                "payload_min <= payload_mean <= payload_max"
+                "fleet payload bounds must satisfy " "payload_min <= payload_mean <= payload_max"
             )
 
 
@@ -122,9 +118,7 @@ class SimulationConfig:
         if self.warmup_minutes < 0:
             raise ConfigError("simulation.warmup_minutes must be nonnegative")
         if self.warmup_minutes >= self.duration_minutes:
-            raise ConfigError(
-                "simulation.warmup_minutes must be less than duration_minutes"
-            )
+            raise ConfigError("simulation.warmup_minutes must be less than duration_minutes")
 
 
 @dataclass(frozen=True)
@@ -135,17 +129,11 @@ class LearningConfig:
 
     def validate(self) -> None:
         if not (0.0 < self.ewma_alpha <= 1.0):
-            raise ConfigError(
-                f"learning.ewma_alpha must be in (0, 1], got {self.ewma_alpha}"
-            )
+            raise ConfigError(f"learning.ewma_alpha must be in (0, 1], got {self.ewma_alpha}")
         if self.minimum_observations < 0:
-            raise ConfigError(
-                "learning.minimum_observations must be nonnegative"
-            )
+            raise ConfigError("learning.minimum_observations must be nonnegative")
         if self.switch_penalty_minutes < 0:
-            raise ConfigError(
-                "learning.switch_penalty_minutes must be nonnegative"
-            )
+            raise ConfigError("learning.switch_penalty_minutes must be nonnegative")
 
 
 @dataclass(frozen=True)
@@ -164,13 +152,11 @@ class RouteConfig:
             )
         if self.distance_km <= 0:
             raise ConfigError(
-                f"route {self.origin}->{self.destination}: "
-                "distance_km must be positive"
+                f"route {self.origin}->{self.destination}: " "distance_km must be positive"
             )
         if self.mean_speed_kph <= 0:
             raise ConfigError(
-                f"route {self.origin}->{self.destination}: "
-                "mean_speed_kph must be positive"
+                f"route {self.origin}->{self.destination}: " "mean_speed_kph must be positive"
             )
 
 
@@ -215,34 +201,22 @@ class ScenarioConfig:
         if self.routes:
             self._validate_route_completeness(shovel_ids, dump_ids)
 
-    def _validate_route_completeness(
-        self, shovel_ids: set[str], dump_ids: set[str]
-    ) -> None:
+    def _validate_route_completeness(self, shovel_ids: set[str], dump_ids: set[str]) -> None:
         for route in self.routes:
             route.validate()
 
-        empty_pairs = {
-            (r.origin, r.destination)
-            for r in self.routes
-            if r.load_state == "empty"
-        }
-        loaded_pairs = {
-            (r.origin, r.destination)
-            for r in self.routes
-            if r.load_state == "loaded"
-        }
+        empty_pairs = {(r.origin, r.destination) for r in self.routes if r.load_state == "empty"}
+        loaded_pairs = {(r.origin, r.destination) for r in self.routes if r.load_state == "loaded"}
 
         for dump_id in dump_ids:
             for shovel_id in shovel_ids:
                 if (dump_id, shovel_id) not in empty_pairs:
                     raise ConfigError(
-                        f"Missing empty route from dump {dump_id} "
-                        f"to shovel {shovel_id}"
+                        f"Missing empty route from dump {dump_id} " f"to shovel {shovel_id}"
                     )
                 if (shovel_id, dump_id) not in loaded_pairs:
                     raise ConfigError(
-                        f"Missing loaded route from shovel {shovel_id} "
-                        f"to dump {dump_id}"
+                        f"Missing loaded route from shovel {shovel_id} " f"to dump {dump_id}"
                     )
 
 
@@ -278,9 +252,7 @@ def load_scenario(
         learning = LearningConfig(
             ewma_alpha=float(raw["learning"]["ewma_alpha"]),
             minimum_observations=int(raw["learning"]["minimum_observations"]),
-            switch_penalty_minutes=float(
-                raw["learning"]["switch_penalty_minutes"]
-            ),
+            switch_penalty_minutes=float(raw["learning"]["switch_penalty_minutes"]),
         )
         fleet = FleetConfig(
             number_of_trucks=int(raw["fleet"]["number_of_trucks"]),
@@ -315,8 +287,7 @@ def load_scenario(
         )
 
     dumps = [
-        DumpConfig(id=d["id"], dump=_triangular_from_dict(d, "dump"))
-        for d in raw.get("dumps", [])
+        DumpConfig(id=d["id"], dump=_triangular_from_dict(d, "dump")) for d in raw.get("dumps", [])
     ]
 
     routes: list[RouteConfig] = []
@@ -326,8 +297,11 @@ def load_scenario(
             raise ConfigError(f"Routes file not found: {routes_path}")
         routes_df = pd.read_csv(routes_path)
         required_columns = {
-            "origin", "destination", "load_state",
-            "distance_km", "mean_speed_kph",
+            "origin",
+            "destination",
+            "load_state",
+            "distance_km",
+            "mean_speed_kph",
         }
         missing = required_columns - set(routes_df.columns)
         if missing:

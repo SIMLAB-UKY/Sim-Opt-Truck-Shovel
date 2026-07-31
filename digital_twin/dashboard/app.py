@@ -38,6 +38,7 @@ st.set_page_config(
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def get_scenario_files() -> list[str]:
     return sorted([f.name for f in SCENARIOS_DIR.glob("*.json")])
 
@@ -55,6 +56,7 @@ def run_simulation(
     config = load_scenario(str(scenario_path), str(ROUTES_PATH))
 
     from dataclasses import replace
+
     if duration is not None:
         sim = replace(config.simulation, duration_minutes=float(duration))
         config = replace(config, simulation=sim)
@@ -89,6 +91,7 @@ def run_simulation(
 # ---------------------------------------------------------------------------
 # Page 1: Run a Scenario
 # ---------------------------------------------------------------------------
+
 
 def page_run_scenario():
     st.title("🚛 Run a Scenario")
@@ -269,6 +272,7 @@ def page_run_scenario():
 # Page 2: Compare Policies
 # ---------------------------------------------------------------------------
 
+
 def page_compare_policies():
     st.title("📊 Compare Policies")
 
@@ -314,16 +318,18 @@ def page_compare_policies():
                     enable_disruptions=enable_disruptions,
                     ewma_alpha=ewma_alpha,
                 )
-                all_rows.append({
-                    "policy": policy,
-                    "replication": rep + 1,
-                    "total_production_tonnes": kpis.production.total_production_tonnes,
-                    "tonnes_per_operating_hour": kpis.production.tonnes_per_operating_hour,
-                    "completed_trips": kpis.production.completed_trips,
-                    "mean_cycle_time_min": kpis.cycle.mean_cycle_time_min,
-                    "mean_shovel_queue_wait_min": kpis.queue.mean_shovel_queue_wait_min,
-                    "mean_truck_utilization": kpis.utilization.mean_truck_utilization,
-                })
+                all_rows.append(
+                    {
+                        "policy": policy,
+                        "replication": rep + 1,
+                        "total_production_tonnes": kpis.production.total_production_tonnes,
+                        "tonnes_per_operating_hour": kpis.production.tonnes_per_operating_hour,
+                        "completed_trips": kpis.production.completed_trips,
+                        "mean_cycle_time_min": kpis.cycle.mean_cycle_time_min,
+                        "mean_shovel_queue_wait_min": kpis.queue.mean_shovel_queue_wait_min,
+                        "mean_truck_utilization": kpis.utilization.mean_truck_utilization,
+                    }
+                )
             except Exception as e:
                 st.warning(f"Rep {rep+1} failed for {policy}: {e}")
             progress.progress((pi * n_reps + rep + 1) / total)
@@ -331,14 +337,18 @@ def page_compare_policies():
     df = pd.DataFrame(all_rows)
 
     st.subheader("Results Summary")
-    agg = df.groupby("policy").agg(
-        production_mean=("total_production_tonnes", "mean"),
-        production_std=("total_production_tonnes", "std"),
-        tph_mean=("tonnes_per_operating_hour", "mean"),
-        cycle_mean=("mean_cycle_time_min", "mean"),
-        queue_mean=("mean_shovel_queue_wait_min", "mean"),
-        util_mean=("mean_truck_utilization", "mean"),
-    ).reset_index()
+    agg = (
+        df.groupby("policy")
+        .agg(
+            production_mean=("total_production_tonnes", "mean"),
+            production_std=("total_production_tonnes", "std"),
+            tph_mean=("tonnes_per_operating_hour", "mean"),
+            cycle_mean=("mean_cycle_time_min", "mean"),
+            queue_mean=("mean_shovel_queue_wait_min", "mean"),
+            util_mean=("mean_truck_utilization", "mean"),
+        )
+        .reset_index()
+    )
     st.dataframe(agg.round(2), use_container_width=True)
 
     try:
@@ -348,7 +358,9 @@ def page_compare_policies():
         with col1:
             st.subheader("Production Distribution")
             fig = px.box(
-                df, x="policy", y="total_production_tonnes",
+                df,
+                x="policy",
+                y="total_production_tonnes",
                 labels={"policy": "Policy", "total_production_tonnes": "Production (t)"},
                 color="policy",
             )
@@ -357,7 +369,9 @@ def page_compare_policies():
         with col2:
             st.subheader("Cycle Time Distribution")
             fig = px.box(
-                df, x="policy", y="mean_cycle_time_min",
+                df,
+                x="policy",
+                y="mean_cycle_time_min",
                 labels={"policy": "Policy", "mean_cycle_time_min": "Cycle Time (min)"},
                 color="policy",
             )
@@ -367,7 +381,9 @@ def page_compare_policies():
         with col3:
             st.subheader("Shovel Queue Wait")
             fig = px.box(
-                df, x="policy", y="mean_shovel_queue_wait_min",
+                df,
+                x="policy",
+                y="mean_shovel_queue_wait_min",
                 labels={"policy": "Policy", "mean_shovel_queue_wait_min": "Queue Wait (min)"},
                 color="policy",
             )
@@ -376,7 +392,9 @@ def page_compare_policies():
         with col4:
             st.subheader("Truck Utilization")
             fig = px.box(
-                df, x="policy", y="mean_truck_utilization",
+                df,
+                x="policy",
+                y="mean_truck_utilization",
                 labels={"policy": "Policy", "mean_truck_utilization": "Utilization"},
                 color="policy",
             )
@@ -392,6 +410,7 @@ def page_compare_policies():
 # ---------------------------------------------------------------------------
 # Page 3: Adaptive Inspector
 # ---------------------------------------------------------------------------
+
 
 def page_adaptive_inspector():
     st.title("🔍 Adaptive Controller Inspector")
@@ -509,9 +528,9 @@ def page_adaptive_inspector():
     # ── Equipment status ─────────────────────────────────────────────────
     st.subheader("Equipment Status")
     if enable_disruptions:
-        disruption_df = df[df["event_type"].isin(
-            ["SHOVEL_FAILED", "SHOVEL_REPAIRED", "SHOVEL_REPAIR_START"]
-        )]
+        disruption_df = df[
+            df["event_type"].isin(["SHOVEL_FAILED", "SHOVEL_REPAIRED", "SHOVEL_REPAIR_START"])
+        ]
         if not disruption_df.empty:
             st.dataframe(
                 disruption_df[["sim_time_min", "event_type", "shovel_id", "notes"]],
@@ -526,7 +545,11 @@ def page_adaptive_inspector():
     st.subheader("Recent Dispatch Events (last 20)")
     dispatch_df = df[df["event_type"] == "DISPATCH"].tail(20)
     if not dispatch_df.empty:
-        cols = [c for c in ["sim_time_min", "truck_id", "shovel_id", "dump_id"] if c in dispatch_df.columns]
+        cols = [
+            c
+            for c in ["sim_time_min", "truck_id", "shovel_id", "dump_id"]
+            if c in dispatch_df.columns
+        ]
         st.dataframe(dispatch_df[cols], use_container_width=True)
 
     # ── Full event log ───────────────────────────────────────────────────

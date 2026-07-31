@@ -19,14 +19,8 @@ import pytest
 from truck_shovel_dt.config import load_scenario
 from truck_shovel_dt.simulation import MinimalSimulation, Sampler
 
-BASE_SCENARIO = (
-    Path(__file__).resolve().parents[1]
-    / "data" / "scenarios" / "base_scenario.json"
-)
-ROUTES = (
-    Path(__file__).resolve().parents[1]
-    / "data" / "scenarios" / "routes.csv"
-)
+BASE_SCENARIO = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "base_scenario.json"
+ROUTES = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "routes.csv"
 
 DETERMINISTIC_VALUES = {
     "empty_travel": 5.0,
@@ -56,6 +50,7 @@ def deterministic_result_1truck():
     """One truck, deterministic, duration=51 min."""
     config = load_scenario(BASE_SCENARIO, ROUTES)
     from dataclasses import replace
+
     sim = replace(config.simulation, duration_minutes=51.0)
     config = replace(config, simulation=sim)
 
@@ -79,6 +74,7 @@ def deterministic_result_3trucks():
     """Three trucks, deterministic, duration=120 min."""
     config = load_scenario(BASE_SCENARIO, ROUTES)
     from dataclasses import replace
+
     sim = replace(config.simulation, duration_minutes=120.0)
     config = replace(config, simulation=sim)
 
@@ -98,6 +94,7 @@ def deterministic_result_3trucks():
 
 
 # ── Day 3 tests (still valid) ────────────────────────────────────────────────
+
 
 def test_deterministic_completed_trips(deterministic_result_1truck):
     """Hand check: cycle=17 min, duration=51 min → exactly 3 trips."""
@@ -149,12 +146,11 @@ def test_cycle_duration_is_correct(deterministic_result_1truck):
 
 # ── Day 4 tests ──────────────────────────────────────────────────────────────
 
+
 def test_multiple_trucks_are_created(deterministic_result_3trucks):
     """All three trucks must appear in the event log."""
     truck_ids = {
-        r["truck_id"]
-        for r in deterministic_result_3trucks.event_log.records
-        if "truck_id" in r
+        r["truck_id"] for r in deterministic_result_3trucks.event_log.records if "truck_id" in r
     }
     assert "T01" in truck_ids
     assert "T02" in truck_ids
@@ -218,16 +214,20 @@ def test_stochastic_mode_multiple_trucks():
     rng1 = np.random.default_rng(config.simulation.seed)
     sampler1 = Sampler(config=config, rng=rng1)
     result1 = MinimalSimulation(
-        config=config, sampler=sampler1,
-        shovel_id="S1", dump_id="D1",
+        config=config,
+        sampler=sampler1,
+        shovel_id="S1",
+        dump_id="D1",
         number_of_trucks=1,
     ).run()
 
     rng6 = np.random.default_rng(config.simulation.seed)
     sampler6 = Sampler(config=config, rng=rng6)
     result6 = MinimalSimulation(
-        config=config, sampler=sampler6,
-        shovel_id="S1", dump_id="D1",
+        config=config,
+        sampler=sampler6,
+        shovel_id="S1",
+        dump_id="D1",
         number_of_trucks=6,
     ).run()
 
