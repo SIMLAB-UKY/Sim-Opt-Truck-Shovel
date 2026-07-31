@@ -14,10 +14,10 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-
 # ---------------------------------------------------------------------------
 # KPI dataclasses
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ProductionKPIs:
@@ -82,6 +82,7 @@ class KPISummary:
 # Main KPI calculator
 # ---------------------------------------------------------------------------
 
+
 class KPICalculator:
     """Calculate all mandatory KPIs from a simulation event log DataFrame."""
 
@@ -121,11 +122,7 @@ class KPICalculator:
 
     def _production_kpis(self) -> ProductionKPIs:
         dumps = self._pw[self._pw["event_type"] == "DUMPING_END"]
-        total_tonnes = (
-            dumps["payload_tonnes"].sum()
-            if "payload_tonnes" in dumps.columns
-            else 0.0
-        )
+        total_tonnes = dumps["payload_tonnes"].sum() if "payload_tonnes" in dumps.columns else 0.0
         completed_trips = len(dumps)
         hours = self._post_warmup_duration / 60.0
         tph = total_tonnes / hours if hours > 0 else 0.0
@@ -149,15 +146,17 @@ class KPICalculator:
         pw_trucks = self._pw[self._pw["truck_id"].notna()].copy()
 
         for truck_id in pw_trucks["truck_id"].unique():
-            group = pw_trucks[pw_trucks["truck_id"] == truck_id].sort_values(
-                "sim_time_min", kind="stable"
-            ).reset_index(drop=True)
+            group = (
+                pw_trucks[pw_trucks["truck_id"] == truck_id]
+                .sort_values("sim_time_min", kind="stable")
+                .reset_index(drop=True)
+            )
 
             events = group["event_type"].tolist()
             times = group["sim_time_min"].tolist()
 
             dispatch_time: float | None = None
-            for evt, t in zip(events, times):
+            for evt, t in zip(events, times, strict=False):
                 if evt == "DISPATCH":
                     dispatch_time = t
                 elif evt == "DUMPING_END" and dispatch_time is not None:
@@ -177,13 +176,11 @@ class KPICalculator:
 
     def _queue_kpis(self) -> QueueKPIs:
         shovel_waits = self._pw[
-            (self._pw["event_type"] == "LOADING_START")
-            & (self._pw["queue_wait_min"].notna())
+            (self._pw["event_type"] == "LOADING_START") & (self._pw["queue_wait_min"].notna())
         ]["queue_wait_min"]
 
         dump_waits = self._pw[
-            (self._pw["event_type"] == "DUMPING_START")
-            & (self._pw["queue_wait_min"].notna())
+            (self._pw["event_type"] == "DUMPING_START") & (self._pw["queue_wait_min"].notna())
         ]["queue_wait_min"]
 
         return QueueKPIs(
@@ -202,9 +199,7 @@ class KPICalculator:
     def _utilization_kpis(self) -> UtilizationKPIs:
         truck_util = self._truck_utilization()
         shovel_util, shovel_idle = self._shovel_utilization()
-        mean_util = (
-            sum(truck_util.values()) / len(truck_util) if truck_util else 0.0
-        )
+        mean_util = sum(truck_util.values()) / len(truck_util) if truck_util else 0.0
         return UtilizationKPIs(
             truck_utilization=truck_util,
             shovel_utilization=shovel_util,
@@ -225,14 +220,12 @@ class KPICalculator:
 
         pw_trucks = self._pw[self._pw["truck_id"].notna()]
         for truck_id in pw_trucks["truck_id"].unique():
-            group = pw_trucks[pw_trucks["truck_id"] == truck_id].sort_values(
-                "sim_time_min"
-            )
+            group = pw_trucks[pw_trucks["truck_id"] == truck_id].sort_values("sim_time_min")
             productive_time = 0.0
             for start_evt, end_evt in productive_pairs:
                 starts = sorted(group[group["event_type"] == start_evt]["sim_time_min"].tolist())
                 ends = sorted(group[group["event_type"] == end_evt]["sim_time_min"].tolist())
-                for s, e in zip(starts, ends):
+                for s, e in zip(starts, ends, strict=False):
                     productive_time += max(0.0, e - s)
             util = min(1.0, productive_time / available) if available > 0 else 0.0
             result[truck_id] = round(util, 4)
@@ -282,25 +275,22 @@ class KPICalculator:
             group = pw_trucks[pw_trucks["truck_id"] == truck_id]
             dumps = group[group["event_type"] == "DUMPING_END"]
             trips = len(dumps)
-            tonnes = (
-                dumps["payload_tonnes"].sum()
-                if "payload_tonnes" in dumps.columns
-                else 0.0
-            )
+            tonnes = dumps["payload_tonnes"].sum() if "payload_tonnes" in dumps.columns else 0.0
             shovel_waits = group[
-                (group["event_type"] == "LOADING_START")
-                & (group["queue_wait_min"].notna())
+                (group["event_type"] == "LOADING_START") & (group["queue_wait_min"].notna())
             ]["queue_wait_min"]
 
-            rows.append({
-                "truck_id": truck_id,
-                "completed_trips": trips,
-                "total_tonnes": round(float(tonnes), 2),
-                "mean_shovel_wait_min": round(
-                    float(shovel_waits.mean()) if len(shovel_waits) > 0 else 0.0, 4
-                ),
-                "utilization": truck_util.get(truck_id, 0.0),
-            })
+            rows.append(
+                {
+                    "truck_id": truck_id,
+                    "completed_trips": trips,
+                    "total_tonnes": round(float(tonnes), 2),
+                    "mean_shovel_wait_min": round(
+                        float(shovel_waits.mean()) if len(shovel_waits) > 0 else 0.0, 4
+                    ),
+                    "utilization": truck_util.get(truck_id, 0.0),
+                }
+            )
 
         return pd.DataFrame(rows).reset_index(drop=True)
 
@@ -312,16 +302,17 @@ class KPICalculator:
         rows = []
         for shovel_id in sorted(shovel_util.keys()):
             loads = self._pw[
-                (self._pw["event_type"] == "LOADING_END")
-                & (self._pw["shovel_id"] == shovel_id)
+                (self._pw["event_type"] == "LOADING_END") & (self._pw["shovel_id"] == shovel_id)
             ]
-            rows.append({
-                "resource_id": shovel_id,
-                "resource_type": "shovel",
-                "completed_loads": len(loads),
-                "utilization": shovel_util[shovel_id],
-                "idle_time_min": shovel_idle[shovel_id],
-            })
+            rows.append(
+                {
+                    "resource_id": shovel_id,
+                    "resource_type": "shovel",
+                    "completed_loads": len(loads),
+                    "utilization": shovel_util[shovel_id],
+                    "idle_time_min": shovel_idle[shovel_id],
+                }
+            )
         return pd.DataFrame(rows)
 
     # ── Consistency checks ───────────────────────────────────────────────

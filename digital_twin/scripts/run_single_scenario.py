@@ -18,8 +18,8 @@ from pathlib import Path
 import numpy as np
 
 from truck_shovel_dt.config import load_scenario
-from truck_shovel_dt.simulation import TruckShovelSimulation, Sampler
 from truck_shovel_dt.metrics import KPICalculator
+from truck_shovel_dt.simulation import Sampler, TruckShovelSimulation
 
 DETERMINISTIC_VALUES = {
     "empty_travel": 5.0,
@@ -85,6 +85,7 @@ def main() -> None:
 
     if args.duration is not None:
         from dataclasses import replace
+
         sim = replace(config.simulation, duration_minutes=args.duration)
         config = replace(config, simulation=sim)
 
@@ -130,7 +131,8 @@ def main() -> None:
     print(f"Mean cycle time      : {kpis.cycle.mean_cycle_time_min:.1f} min")
     print(f"Mean shovel queue    : {kpis.queue.mean_shovel_queue_wait_min:.2f} min")
     print(f"Mean truck utiliz.   : {kpis.utilization.mean_truck_utilization:.1%}")
-    print(f"Shovel utilization   : { {k: f'{v:.1%}' for k, v in kpis.utilization.shovel_utilization.items()} }")
+    shovel_util = {k: f"{v:.1%}" for k, v in kpis.utilization.shovel_utilization.items()}
+    print(f"Shovel utilization   : {shovel_util}")
     print("─" * 50)
 
     # ── Save outputs ─────────────────────────────────────────────────────

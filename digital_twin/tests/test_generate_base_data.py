@@ -21,9 +21,7 @@ GENERATED_DIR = REPO_ROOT / "data" / "generated"
 
 
 def _load_generator_module():
-    spec = importlib.util.spec_from_file_location(
-        "generate_base_data", SCRIPT_PATH
-    )
+    spec = importlib.util.spec_from_file_location("generate_base_data", SCRIPT_PATH)
     module = importlib.util.module_from_spec(spec)
     sys.modules["generate_base_data"] = module
     spec.loader.exec_module(module)
@@ -50,8 +48,11 @@ def test_output_files_exist(generated_once):
 def test_service_time_columns_and_positivity(generated_once):
     df = pd.read_csv(generated_once["service"])
     expected_columns = {
-        "sample_id", "resource_type", "resource_id",
-        "activity", "duration_minutes",
+        "sample_id",
+        "resource_type",
+        "resource_id",
+        "activity",
+        "duration_minutes",
     }
     assert expected_columns.issubset(df.columns)
     assert (df["duration_minutes"] > 0).all()
@@ -61,8 +62,11 @@ def test_service_time_columns_and_positivity(generated_once):
 def test_travel_time_columns_and_positivity(generated_once):
     df = pd.read_csv(generated_once["travel"])
     expected_columns = {
-        "sample_id", "origin", "destination",
-        "load_state", "travel_minutes",
+        "sample_id",
+        "origin",
+        "destination",
+        "load_state",
+        "travel_minutes",
     }
     assert expected_columns.issubset(df.columns)
     assert (df["travel_minutes"] > 0).all()
