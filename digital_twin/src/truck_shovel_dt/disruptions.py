@@ -16,16 +16,17 @@ This module provides:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 import simpy
 
-
 # ---------------------------------------------------------------------------
 # Availability tracker
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ShovelAvailability:
@@ -56,6 +57,7 @@ class ShovelAvailability:
 # ---------------------------------------------------------------------------
 # Disruption process
 # ---------------------------------------------------------------------------
+
 
 def shovel_disruption_process(
     env: simpy.Environment,

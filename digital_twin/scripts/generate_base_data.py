@@ -46,9 +46,7 @@ def main() -> None:
 
     scenario_path = SCENARIO_DIR / "base_scenario.json"
     if not scenario_path.exists():
-        raise FileNotFoundError(
-            f"Create {scenario_path} from the project-plan template first."
-        )
+        raise FileNotFoundError(f"Create {scenario_path} from the project-plan template first.")
 
     with scenario_path.open("r", encoding="utf-8") as file:
         scenario = json.load(file)
@@ -130,9 +128,7 @@ def main() -> None:
                 }
             )
 
-    pd.DataFrame(travel_rows).to_csv(
-        GENERATED_DIR / "travel_time_samples.csv", index=False
-    )
+    pd.DataFrame(travel_rows).to_csv(GENERATED_DIR / "travel_time_samples.csv", index=False)
 
     summary = {
         "seed": SEED,
@@ -141,9 +137,7 @@ def main() -> None:
         "travel_rows": len(travel_rows),
         "payload_rows": len(payload),
     }
-    with (GENERATED_DIR / "generation_summary.json").open(
-        "w", encoding="utf-8"
-    ) as file:
+    with (GENERATED_DIR / "generation_summary.json").open("w", encoding="utf-8") as file:
         json.dump(summary, file, indent=2)
 
     print("Synthetic base data generated successfully.")

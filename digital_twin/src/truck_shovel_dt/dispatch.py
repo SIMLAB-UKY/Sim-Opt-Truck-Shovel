@@ -11,18 +11,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-
 # ---------------------------------------------------------------------------
 # State snapshot — what the dispatcher sees at decision time
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ShovelState:
     shovel_id: str
-    available: bool           # False if failed or under repair
-    queue_length: int         # trucks waiting (not yet being loaded)
+    available: bool  # False if failed or under repair
+    queue_length: int  # trucks waiting (not yet being loaded)
     remaining_service_min: float  # estimated time until current truck finishes
-    ewma_loading_min: float   # current EWMA loading estimate
+    ewma_loading_min: float  # current EWMA loading estimate
 
 
 @dataclass
@@ -37,8 +37,8 @@ class DumpState:
 class RouteState:
     origin: str
     destination: str
-    load_state: str           # 'empty' or 'loaded'
-    ewma_travel_min: float    # current EWMA travel estimate
+    load_state: str  # 'empty' or 'loaded'
+    ewma_travel_min: float  # current EWMA travel estimate
 
 
 @dataclass
@@ -46,7 +46,7 @@ class SystemState:
     shovels: list[ShovelState]
     dumps: list[DumpState]
     routes: list[RouteState]
-    current_location: str     # where the truck currently is
+    current_location: str  # where the truck currently is
 
 
 @dataclass
@@ -61,13 +61,12 @@ class Assignment:
 # Policy protocol
 # ---------------------------------------------------------------------------
 
+
 @runtime_checkable
 class DispatchPolicy(Protocol):
     name: str
 
-    def choose_assignment(
-        self, state: SystemState, truck_id: str
-    ) -> Assignment:
+    def choose_assignment(self, state: SystemState, truck_id: str) -> Assignment:
         """Return shovel_id, dump_id, score, and explanation."""
         ...
 
@@ -76,6 +75,7 @@ class DispatchPolicy(Protocol):
 # Helper: route lookup
 # ---------------------------------------------------------------------------
 
+
 def _get_travel(
     routes: list[RouteState],
     origin: str,
@@ -83,11 +83,7 @@ def _get_travel(
     load_state: str,
 ) -> float:
     for r in routes:
-        if (
-            r.origin == origin
-            and r.destination == destination
-            and r.load_state == load_state
-        ):
+        if r.origin == origin and r.destination == destination and r.load_state == load_state:
             return r.ewma_travel_min
     # fallback: return a large penalty if route not found
     return 9999.0
@@ -96,6 +92,7 @@ def _get_travel(
 # ---------------------------------------------------------------------------
 # Policy 1: Fixed Assignment
 # ---------------------------------------------------------------------------
+
 
 class FixedAssignment:
     """Assign trucks to shovels before the shift begins.
@@ -125,7 +122,7 @@ class FixedAssignment:
         shovel_ids: list[str],
         dump_ids: list[str],
         routes: list[RouteState],
-    ) -> "FixedAssignment":
+    ) -> FixedAssignment:
         """Build pre-shift assignments from config information."""
         assignments: dict[str, tuple[str, str]] = {}
         for i, truck_id in enumerate(truck_ids):
@@ -134,17 +131,13 @@ class FixedAssignment:
             assignments[truck_id] = (shovel_id, dump_id)
         return cls(assignments)
 
-    def choose_assignment(
-        self, state: SystemState, truck_id: str
-    ) -> Assignment:
+    def choose_assignment(self, state: SystemState, truck_id: str) -> Assignment:
         shovel_id, dump_id = self._assignments.get(
             truck_id, (state.shovels[0].shovel_id, state.dumps[0].dump_id)
         )
 
         # Check if assigned shovel is available
-        assigned_shovel = next(
-            (s for s in state.shovels if s.shovel_id == shovel_id), None
-        )
+        assigned_shovel = next((s for s in state.shovels if s.shovel_id == shovel_id), None)
 
         if assigned_shovel is None or not assigned_shovel.available:
             # Fallback: shortest queue among available shovels
@@ -175,13 +168,9 @@ class FixedAssignment:
                 f"fallback to {shovel_id} (queue={fallback.queue_length})."
             )
         else:
-            explanation = (
-                f"Truck {truck_id}: fixed assignment → {shovel_id}, {dump_id}."
-            )
+            explanation = f"Truck {truck_id}: fixed assignment → {shovel_id}, {dump_id}."
 
-        travel = _get_travel(
-            state.routes, state.current_location, shovel_id, "empty"
-        )
+        travel = _get_travel(state.routes, state.current_location, shovel_id, "empty")
 
         return Assignment(
             shovel_id=shovel_id,
@@ -194,6 +183,7 @@ class FixedAssignment:
 # ---------------------------------------------------------------------------
 # Policy 2: Shortest Queue
 # ---------------------------------------------------------------------------
+
 
 class ShortestQueue:
     """Select the available shovel with the fewest waiting trucks.
@@ -208,9 +198,7 @@ class ShortestQueue:
 
     name = "shortest_queue"
 
-    def choose_assignment(
-        self, state: SystemState, truck_id: str
-    ) -> Assignment:
+    def choose_assignment(self, state: SystemState, truck_id: str) -> Assignment:
         available_shovels = [s for s in state.shovels if s.available]
 
         if not available_shovels:
@@ -227,9 +215,7 @@ class ShortestQueue:
         # Score each shovel: primary = queue_length,
         # tie-break 1 = empty travel time, tie-break 2 = shovel_id
         def shovel_key(s: ShovelState) -> tuple[int, float, str]:
-            travel = _get_travel(
-                state.routes, state.current_location, s.shovel_id, "empty"
-            )
+            travel = _get_travel(state.routes, state.current_location, s.shovel_id, "empty")
             return (s.queue_length, travel, s.shovel_id)
 
         best_shovel = min(available_shovels, key=shovel_key)
@@ -241,9 +227,7 @@ class ShortestQueue:
             available_dumps = state.dumps  # fallback if all unavailable
 
         def dump_key(d: DumpState) -> tuple[float, str]:
-            t = _get_travel(
-                state.routes, best_shovel.shovel_id, d.dump_id, "loaded"
-            )
+            t = _get_travel(state.routes, best_shovel.shovel_id, d.dump_id, "loaded")
             return (t, d.dump_id)
 
         best_dump = min(available_dumps, key=dump_key)
@@ -254,9 +238,7 @@ class ShortestQueue:
         # Build candidate summary for logging
         candidates = []
         for s in available_shovels:
-            t = _get_travel(
-                state.routes, state.current_location, s.shovel_id, "empty"
-            )
+            t = _get_travel(state.routes, state.current_location, s.shovel_id, "empty")
             candidates.append(f"{s.shovel_id}(q={s.queue_length}, t={t:.1f})")
 
         explanation = (
@@ -277,6 +259,7 @@ class ShortestQueue:
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
+
 
 def _best_dump_for_shovel(
     shovel_id: str,
@@ -315,6 +298,7 @@ def build_system_state(
 # Policy 3: Adaptive Estimated Completion Time (ECT)
 # ---------------------------------------------------------------------------
 
+
 class AdaptiveECT:
     """Adaptive dispatch using estimated completion time scoring.
 
@@ -342,7 +326,7 @@ class AdaptiveECT:
 
     def __init__(
         self,
-        estimators: "EstimatorRegistry",  # noqa: F821
+        estimators: EstimatorRegistry,  # noqa: F821
         switch_penalty_minutes: float = 0.5,
         last_shovel: dict[str, str] | None = None,
     ) -> None:
@@ -350,9 +334,7 @@ class AdaptiveECT:
         self._penalty = switch_penalty_minutes
         self._last_shovel: dict[str, str] = last_shovel if last_shovel is not None else {}
 
-    def choose_assignment(
-        self, state: SystemState, truck_id: str
-    ) -> Assignment:
+    def choose_assignment(self, state: SystemState, truck_id: str) -> Assignment:
         available_shovels = [s for s in state.shovels if s.available]
 
         if not available_shovels:
@@ -374,9 +356,7 @@ class AdaptiveECT:
             sid = shovel.shovel_id
 
             # Empty travel estimate
-            t_empty = self._estimators.get_empty_travel(
-                state.current_location, sid
-            )
+            t_empty = self._estimators.get_empty_travel(state.current_location, sid)
 
             # Queue and loading estimate
             t_loading = self._estimators.get_loading(sid)
@@ -410,9 +390,7 @@ class AdaptiveECT:
                 penalty = self._penalty
             score += penalty
 
-            if score < best_score or (
-                score == best_score and sid < best_shovel_id
-            ):
+            if score < best_score or (score == best_score and sid < best_shovel_id):
                 best_score = score
                 best_shovel_id = sid
                 best_dump_id = best_dump.dump_id
@@ -429,9 +407,7 @@ class AdaptiveECT:
         self._last_shovel[truck_id] = best_shovel_id
 
         # Build explanation
-        component_str = ", ".join(
-            f"{k}={v}" for k, v in best_components.items()
-        )
+        component_str = ", ".join(f"{k}={v}" for k, v in best_components.items())
         explanation = (
             f"Truck {truck_id}: adaptive ECT → {best_shovel_id}, {best_dump_id}. "
             f"Score={best_score:.2f} ({component_str})."

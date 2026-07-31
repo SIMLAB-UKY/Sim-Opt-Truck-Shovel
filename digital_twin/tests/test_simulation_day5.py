@@ -8,16 +8,10 @@ import numpy as np
 import pytest
 
 from truck_shovel_dt.config import load_scenario
-from truck_shovel_dt.simulation import TruckShovelSimulation, Sampler
+from truck_shovel_dt.simulation import Sampler, TruckShovelSimulation
 
-BASE_SCENARIO = (
-    Path(__file__).resolve().parents[1]
-    / "data" / "scenarios" / "base_scenario.json"
-)
-ROUTES = (
-    Path(__file__).resolve().parents[1]
-    / "data" / "scenarios" / "routes.csv"
-)
+BASE_SCENARIO = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "base_scenario.json"
+ROUTES = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "routes.csv"
 
 DETERMINISTIC_VALUES = {
     "empty_travel": 5.0,
@@ -43,6 +37,7 @@ def deterministic_full_result():
     """6 trucks, 2 shovels, 2 dumps, deterministic, 120-min shift."""
     config = load_scenario(BASE_SCENARIO, ROUTES)
     from dataclasses import replace
+
     sim = replace(config.simulation, duration_minutes=120.0)
     config = replace(config, simulation=sim)
     rng = np.random.default_rng(config.simulation.seed)
@@ -60,11 +55,7 @@ def test_full_shift_completes_without_deadlock(full_network_result):
 
 def test_all_six_trucks_appear(full_network_result):
     """All 6 trucks must appear in the event log."""
-    truck_ids = {
-        r["truck_id"]
-        for r in full_network_result.event_log.records
-        if "truck_id" in r
-    }
+    truck_ids = {r["truck_id"] for r in full_network_result.event_log.records if "truck_id" in r}
     for i in range(1, 7):
         assert f"T{i:02d}" in truck_ids
 
@@ -109,8 +100,7 @@ def test_no_simultaneous_loading_per_shovel(full_network_result):
                 if i >= j:
                     continue
                 assert not (s1 < e2 and s2 < e1), (
-                    f"Shovel {shovel_id}: simultaneous loading at "
-                    f"[{s1},{e1}] and [{s2},{e2}]"
+                    f"Shovel {shovel_id}: simultaneous loading at " f"[{s1},{e1}] and [{s2},{e2}]"
                 )
 
 
@@ -135,17 +125,21 @@ def test_fixed_assignment_trucks_stay_assigned(deterministic_full_result):
     # T01, T03, T05 → S1 (index % 2 == 0)
     # T02, T04, T06 → S2 (index % 2 == 1)
     expected = {
-        "T01": "S1", "T02": "S2", "T03": "S1",
-        "T04": "S2", "T05": "S1", "T06": "S2",
+        "T01": "S1",
+        "T02": "S2",
+        "T03": "S1",
+        "T04": "S2",
+        "T05": "S1",
+        "T06": "S2",
     }
     for r in deterministic_full_result.event_log.records:
         if r["event_type"] == "LOADING_START":
             truck = r.get("truck_id")
             shovel = r.get("shovel_id")
             if truck in expected:
-                assert shovel == expected[truck], (
-                    f"{truck} loaded at {shovel} but expected {expected[truck]}"
-                )
+                assert (
+                    shovel == expected[truck]
+                ), f"{truck} loaded at {shovel} but expected {expected[truck]}"
 
 
 def test_event_log_to_dataframe(full_network_result):
@@ -159,6 +153,7 @@ def test_event_log_to_dataframe(full_network_result):
 def test_save_and_reload_summary(full_network_result, tmp_path):
     """Summary JSON must save and reload correctly."""
     import json
+
     path = tmp_path / "summary.json"
     full_network_result.save_summary(path)
     with open(path) as f:

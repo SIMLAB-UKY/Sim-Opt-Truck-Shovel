@@ -9,14 +9,8 @@ import pytest
 
 from truck_shovel_dt.config import ConfigError, load_scenario
 
-BASE_SCENARIO = (
-    Path(__file__).resolve().parents[1]
-    / "data" / "scenarios" / "base_scenario.json"
-)
-ROUTES = (
-    Path(__file__).resolve().parents[1]
-    / "data" / "scenarios" / "routes.csv"
-)
+BASE_SCENARIO = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "base_scenario.json"
+ROUTES = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "routes.csv"
 
 
 def test_base_scenario_loads_and_validates():

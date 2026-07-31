@@ -28,12 +28,12 @@ from scipy import stats
 
 from truck_shovel_dt.config import load_scenario
 from truck_shovel_dt.metrics import KPICalculator
-from truck_shovel_dt.simulation import TruckShovelSimulation, Sampler
-
+from truck_shovel_dt.simulation import Sampler, TruckShovelSimulation
 
 # ---------------------------------------------------------------------------
 # Single replication
 # ---------------------------------------------------------------------------
+
 
 def run_one_replication(
     scenario_path: str,
@@ -79,6 +79,7 @@ def run_one_replication(
 # ---------------------------------------------------------------------------
 # Confidence interval
 # ---------------------------------------------------------------------------
+
 
 def confidence_interval_95(values: list[float]) -> tuple[float, float, float]:
     """Return (mean, lower_95ci, upper_95ci)."""
@@ -130,6 +131,7 @@ def aggregate_replications(df: pd.DataFrame) -> pd.DataFrame:
 # Plotting
 # ---------------------------------------------------------------------------
 
+
 def make_comparison_figure(
     agg_df: pd.DataFrame,
     output_path: Path,
@@ -137,6 +139,7 @@ def make_comparison_figure(
     """Save a policy-comparison bar chart with 95% CI error bars."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -160,15 +163,16 @@ def make_comparison_figure(
     x = np.arange(len(policies))
     colors = ["#4C72B0", "#DD8452", "#55A868"]
 
-    for ax, (kpi, label) in zip(axes, kpis_to_plot):
+    for ax, (kpi, label) in zip(axes, kpis_to_plot, strict=True):
         means = agg_df[f"{kpi}_mean"].tolist()
         lo = agg_df[f"{kpi}_ci_lo"].tolist()
         hi = agg_df[f"{kpi}_ci_hi"].tolist()
-        yerr_lo = [m - l for m, l in zip(means, lo)]
-        yerr_hi = [h - m for m, h in zip(means, hi)]
+        yerr_lo = [m - low for m, low in zip(means, lo, strict=True)]
+        yerr_hi = [h - m for m, h in zip(means, hi, strict=True)]
 
-        bars = ax.bar(
-            x, means,
+        ax.bar(
+            x,
+            means,
             color=colors[: len(policies)],
             alpha=0.85,
             yerr=[yerr_lo, yerr_hi],
@@ -192,6 +196,7 @@ def make_comparison_figure(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -268,8 +273,10 @@ def main() -> None:
             )
             row["replication"] = rep + 1
             all_rows.append(row)
-            print(f"  Rep {rep + 1:02d}: trips={row['completed_trips']}, "
-                  f"production={row['total_production_tonnes']:.0f}t")
+            print(
+                f"  Rep {rep + 1:02d}: trips={row['completed_trips']}, "
+                f"production={row['total_production_tonnes']:.0f}t"
+            )
 
     elapsed = time.time() - start_time
 
@@ -291,11 +298,16 @@ def main() -> None:
 
     # Experiment metadata
     import subprocess
+
     try:
-        git_commit = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
+        git_commit = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
     except Exception:
         git_commit = "unknown"
 
@@ -319,12 +331,16 @@ def main() -> None:
     print("\n── Summary ──────────────────────────────────────────────────")
     for _, row in agg_df.iterrows():
         print(f"\nPolicy: {row['policy']} (n={row['n_replications']})")
-        print(f"  Production : {row['total_production_tonnes_mean']:.1f} t "
-              f"[{row['total_production_tonnes_ci_lo']:.1f}, "
-              f"{row['total_production_tonnes_ci_hi']:.1f}]")
-        print(f"  t/h        : {row['tonnes_per_operating_hour_mean']:.1f} "
-              f"[{row['tonnes_per_operating_hour_ci_lo']:.1f}, "
-              f"{row['tonnes_per_operating_hour_ci_hi']:.1f}]")
+        print(
+            f"  Production : {row['total_production_tonnes_mean']:.1f} t "
+            f"[{row['total_production_tonnes_ci_lo']:.1f}, "
+            f"{row['total_production_tonnes_ci_hi']:.1f}]"
+        )
+        print(
+            f"  t/h        : {row['tonnes_per_operating_hour_mean']:.1f} "
+            f"[{row['tonnes_per_operating_hour_ci_lo']:.1f}, "
+            f"{row['tonnes_per_operating_hour_ci_hi']:.1f}]"
+        )
         print(f"  Cycle time : {row['mean_cycle_time_min_mean']:.2f} min")
         print(f"  Shovel wait: {row['mean_shovel_queue_wait_min_mean']:.3f} min")
     print()

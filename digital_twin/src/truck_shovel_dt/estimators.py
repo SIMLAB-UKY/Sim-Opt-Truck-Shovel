@@ -14,10 +14,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-
 # ---------------------------------------------------------------------------
 # Single EWMA estimator
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class EWMAEstimator:
@@ -70,6 +70,7 @@ class EWMAEstimator:
 # Estimator registry — one per activity/route combination
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class EstimatorRegistry:
     """Manages all EWMA estimators for a simulation run."""
@@ -100,9 +101,7 @@ class EstimatorRegistry:
             minimum_observations=self.minimum_observations,
         )
 
-    def init_empty_travel(
-        self, origin: str, destination: str, initial_minutes: float
-    ) -> None:
+    def init_empty_travel(self, origin: str, destination: str, initial_minutes: float) -> None:
         self._empty_travel[(origin, destination)] = EWMAEstimator(
             name=f"empty_{origin}_{destination}",
             initial_estimate=initial_minutes,
@@ -110,9 +109,7 @@ class EstimatorRegistry:
             minimum_observations=self.minimum_observations,
         )
 
-    def init_loaded_travel(
-        self, origin: str, destination: str, initial_minutes: float
-    ) -> None:
+    def init_loaded_travel(self, origin: str, destination: str, initial_minutes: float) -> None:
         self._loaded_travel[(origin, destination)] = EWMAEstimator(
             name=f"loaded_{origin}_{destination}",
             initial_estimate=initial_minutes,
@@ -122,14 +119,10 @@ class EstimatorRegistry:
 
     # ── Updates ──────────────────────────────────────────────────────────
 
-    def update_loading(
-        self, shovel_id: str, observed: float
-    ) -> tuple[float, float]:
+    def update_loading(self, shovel_id: str, observed: float) -> tuple[float, float]:
         return self._loading[shovel_id].update(observed)
 
-    def update_dumping(
-        self, dump_id: str, observed: float
-    ) -> tuple[float, float]:
+    def update_dumping(self, dump_id: str, observed: float) -> tuple[float, float]:
         return self._dumping[dump_id].update(observed)
 
     def update_empty_travel(

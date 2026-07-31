@@ -14,21 +14,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from truck_shovel_dt.config import load_scenario
-from truck_shovel_dt.simulation import TruckShovelSimulation, Sampler
 from truck_shovel_dt.metrics import KPICalculator
+from truck_shovel_dt.simulation import Sampler, TruckShovelSimulation
 
-BASE_SCENARIO = (
-    Path(__file__).resolve().parents[1]
-    / "data" / "scenarios" / "base_scenario.json"
-)
-ROUTES = (
-    Path(__file__).resolve().parents[1]
-    / "data" / "scenarios" / "routes.csv"
-)
+BASE_SCENARIO = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "base_scenario.json"
+ROUTES = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "routes.csv"
 
 
 @pytest.fixture(scope="module")
@@ -60,6 +53,7 @@ def kpis(calculator):
 
 
 # ── Production KPIs ───────────────────────────────────────────────────────
+
 
 def test_production_is_positive(kpis):
     assert kpis.production.total_production_tonnes > 0
@@ -101,6 +95,7 @@ def test_warmup_exclusion_reduces_trips(base_result, base_config):
 
 # ── Cycle KPIs ────────────────────────────────────────────────────────────
 
+
 def test_cycle_time_is_positive(kpis):
     assert kpis.cycle.mean_cycle_time_min > 0
 
@@ -112,12 +107,14 @@ def test_cycle_time_min_le_mean_le_max(kpis):
 
 # ── Queue KPIs ────────────────────────────────────────────────────────────
 
+
 def test_queue_waits_are_nonnegative(kpis):
     assert kpis.queue.mean_shovel_queue_wait_min >= 0.0
     assert kpis.queue.mean_dump_queue_wait_min >= 0.0
 
 
 # ── Utilization KPIs ──────────────────────────────────────────────────────
+
 
 def test_truck_utilizations_between_0_and_1(kpis):
     for truck_id, util in kpis.utilization.truck_utilization.items():
@@ -144,6 +141,7 @@ def test_mean_truck_utilization_between_0_and_1(kpis):
 
 # ── Tables ────────────────────────────────────────────────────────────────
 
+
 def test_truck_kpi_table_has_all_trucks(calculator):
     table = calculator.truck_kpi_table()
     assert len(table) == 6
@@ -152,8 +150,13 @@ def test_truck_kpi_table_has_all_trucks(calculator):
 
 def test_truck_kpi_table_columns(calculator):
     table = calculator.truck_kpi_table()
-    required = {"truck_id", "completed_trips", "total_tonnes",
-                "mean_shovel_wait_min", "utilization"}
+    required = {
+        "truck_id",
+        "completed_trips",
+        "total_tonnes",
+        "mean_shovel_wait_min",
+        "utilization",
+    }
     assert required.issubset(table.columns)
 
 
@@ -164,12 +167,12 @@ def test_resource_kpi_table_has_both_shovels(calculator):
 
 def test_resource_kpi_table_columns(calculator):
     table = calculator.resource_kpi_table()
-    required = {"resource_id", "resource_type", "completed_loads",
-                "utilization", "idle_time_min"}
+    required = {"resource_id", "resource_type", "completed_loads", "utilization", "idle_time_min"}
     assert required.issubset(table.columns)
 
 
 # ── to_dict ───────────────────────────────────────────────────────────────
+
 
 def test_kpi_summary_to_dict(kpis):
     d = kpis.to_dict()
