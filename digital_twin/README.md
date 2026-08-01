@@ -304,8 +304,8 @@ ESP32-based truck–shovel CPS prototype. Planned extensions:
 
 | Contributor | Role |
 |---|---|
-| **Ali Kamel** | Primary Software Developer — simulation, dispatch, estimators, experiments, dashboard, tests, CI |
-| **Dr. Ali Moradi Afrapoli** | Technical Lead — requirements, modelling assumptions, validation, result interpretation |
+| **Ali Kamelshahroudi** | Primary Software Developer — simulation, dispatch, estimators, experiments, dashboard, tests, CI |
+| **Dr. Ali Moradi** | Technical Lead — requirements, modelling assumptions, validation, result interpretation |
 
 See `CONTRIBUTORS.md` for full attribution.
 
